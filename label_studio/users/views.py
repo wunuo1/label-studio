@@ -17,6 +17,8 @@ from rest_framework.authtoken.models import Token
 from users import forms
 from users.functions import login, proceed_registration
 
+from django.contrib.auth import get_user_model
+
 logger = logging.getLogger()
 
 
@@ -93,40 +95,20 @@ def user_signup(request):
 @enforce_csrf_checks
 def user_login(request):
     """Login page"""
-    user = request.user
-    next_page = request.GET.get('next')
-
+    email = '00000000@qq.com'  # Replace with an email already in the database
+    user = get_user_model().objects.get(email=email)
+    next_page = "/projects/"
+    
     # checks if the URL is a safe redirection.
     if not next_page or not is_safe_url(url=next_page, allowed_hosts=request.get_host()):
         next_page = reverse('projects:project-index')
 
-    login_form = load_func(settings.USER_LOGIN_FORM)
-    form = login_form()
+    login(request, user, backend='django.contrib.auth.backends.ModelBackend')
 
-    if user.is_authenticated:
-        return redirect(next_page)
-
-    if request.method == 'POST':
-        form = login_form(request.POST)
-        if form.is_valid():
-            user = form.cleaned_data['user']
-            login(request, user, backend='django.contrib.auth.backends.ModelBackend')
-            if form.cleaned_data['persist_session'] is not True:
-                # Set the session to expire when the browser is closed
-                request.session['keep_me_logged_in'] = False
-                request.session.set_expiry(0)
-
-            # user is organization member
-            org_pk = Organization.find_by_user(user).pk
-            user.active_organization_id = org_pk
-            user.save(update_fields=['active_organization'])
-            return redirect(next_page)
-
-    if flag_set('fflag_feat_front_lsdv_e_297_increase_oss_to_enterprise_adoption_short'):
-        return render(request, 'users/new-ui/user_login.html', {'form': form, 'next': next_page})
-
-    return render(request, 'users/user_login.html', {'form': form, 'next': next_page})
-
+    org_pk = Organization.find_by_user(user).pk
+    user.active_organization_id = org_pk
+    user.save(update_fields=['active_organization'])
+    return redirect(next_page)
 
 @login_required
 def user_account(request):
